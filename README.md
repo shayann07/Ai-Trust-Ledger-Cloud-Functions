@@ -1,90 +1,87 @@
 # AI Trust Ledger Cloud Functions
 
-This repository contains the deployed Node.js Firebase Cloud Functions used by the AI Trust Ledger app. These functions handle backend logic such as computing team levels and credit profit and calculating daily profits and team rewards.
+JavaScript source for two Firebase Cloud Functions that read AI Trust Ledger team data and process nightly investment profit and team rewards in Cloud Firestore.
+
+> **Project status:** This repository contains function source files only. It does not include `package.json`, a Firebase entry point, Firebase project configuration, tests, or deployment metadata, so it cannot be installed or deployed as a standalone project in its current form.
 
 ## Functions
 
-- **computeteamlevelsandcreditprofit.js** – Scheduled function that calculates and updates team levels and credit profit for users based on their investments and referrals.
-- **dailyprofitandteamrewards.js** – Scheduled function that processes daily ROI (return on investment) and team rewards distributions, crediting user wallets and updating transaction history.
+### `computeTeamLevelsAndCreditProfit`
 
-## Getting Started
+A second-generation HTTPS callable function configured for `us-central1` with a 60-second timeout and 512 MiB of memory.
 
-To run or deploy these functions yourself:
+The function:
 
-1. **Clone this repository**.
+- Requires a `userId` value in the callable request data.
+- Loads ordered level rules from the `teamSettings` collection.
+- Walks the user's referral tree one configured level at a time.
+- Counts active and inactive users at each level.
+- Aggregates account deposits and daily-profit values for active team members.
+- Returns per-level user and summary data for UI display.
+- Does not update balances, create transactions, or credit team profit.
 
-   ```bash
-   git clone https://github.com/shayann07/Ai-Trust-Ledger-Cloud-Functions.git
-   ```
+The returned object contains `levels`, `profitBooked: false`, and `creditedAmount: 0`.
 
-2. **Navigate into the functions directory** and install dependencies:
+### `dailyProfitAndTeamRewards`
 
-   ```bash
-   cd Ai-Trust-Ledger-Cloud-Functions
-   npm install
-   ```
+A second-generation scheduled function configured to run every day at `00:00` in the `Asia/Karachi` time zone. It uses a 540-second timeout, 1 GiB of memory, and scheduler retry settings.
 
-3. **Set up Firebase** using the Firebase CLI. If you haven’t already, install the CLI and log in:
+The job runs two sequential phases:
 
-   ```bash
-   npm install -g firebase-tools
-   firebase login
-   ```
+1. **Plan profit processing** scans users in pages of 500 with up to 50 concurrent user tasks. It finalizes expired medicine plans, tracks missed-day profit for stock and medicine plans, updates active forex profit, refreshes plan percentages from configuration, and records relevant account and transaction changes.
+2. **Team reward processing** scans the same user set with up to 25 concurrent tasks. It traverses configured referral levels, calculates unlocked level shares from active members' daily profit, credits eligible root accounts, and creates team-reward transactions.
 
-4. **Configure your Firebase project** by specifying your project ID:
+Firestore transactions are retried for selected transient errors. Daily plan and team processing use deterministic documents in `dailyProfitLogs` and `dailyTeamProfitLogs` to avoid booking the same work more than once for a Pakistan-calendar day.
 
-   ```bash
-   firebase use --add
-   ```
+## Firestore Data Used
 
-5. **Add environment variables** (e.g. API keys, secret keys) using `firebase functions:config:set` or the `.env` file (not included for security).
+The implementation reads or writes these collections:
 
-6. **Deploy the functions**:
+- `users`
+- `accounts`
+- `plans`
+- `userPlans`
+- `teamSettings`
+- `transactions`
+- `dailyProfitLogs`
+- `dailyTeamProfitLogs`
 
-   ```bash
-   firebase deploy --only functions
-   ```
+The functions depend on the exact field names and nested account maps used by the companion AI Trust Ledger applications. Required composite indexes and Firebase security/configuration files are not documented in this repository.
 
-## Technologies Used
+## Tech Stack
 
-- **Node.js** – JavaScript runtime.
-- **Firebase Cloud Functions** – Serverless functions for backend logic.
-- **Cloud Firestore / Firebase Admin** – Database and admin SDK for secure server-side access.
+- Node.js-style CommonJS JavaScript
+- Firebase Functions v2 HTTPS callable and scheduler APIs
+- Firebase Admin SDK
+- Cloud Firestore transactions, queries, timestamps, and atomic increments
+- `p-limit` for bounded concurrency
 
-## License
+## Source Layout
 
-This project is licensed under the **MIT License**. Feel free to use and modify as needed.
+```text
+.
+|-- computeteamlevelsandcreditprofit.js  # Callable referral/team statistics
+|-- dailyprofitandteamrewards.js         # Nightly plan profit and team rewards
+`-- README.md
+```
 
-<!-- gitpulse:contribution index="1" timestamp="2026-04-29" -->
-<!-- gitpulse:contribution index="2" timestamp="2026-05-04" -->
-<!-- gitpulse:contribution index="3" timestamp="2026-05-04" -->
-<!-- gitpulse:contribution index="4" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="5" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="6" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="7" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="8" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="9" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="10" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="11" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="12" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="13" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="14" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="15" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="16" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="17" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="18" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="19" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="20" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="21" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="22" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="23" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="24" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="25" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="26" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="27" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="28" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="29" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="30" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="31" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="32" timestamp="2026-05-05" -->
-<!-- gitpulse:contribution index="33" timestamp="2026-05-05" -->
+## Integrating the Source
+
+These files must be incorporated into an existing or newly initialized Firebase Functions project before they can run. That host project needs to:
+
+1. Provide compatible CommonJS versions of `firebase-functions`, `firebase-admin`, and `p-limit`.
+2. Initialize the Firebase Admin SDK once and expose both exported functions from the Functions entry point.
+3. Select the intended Firebase project and configure any required Firestore indexes.
+4. Validate the schema and financial rules against non-production data.
+5. Exercise callable and scheduled behavior with the Firebase Emulator Suite or equivalent tests.
+6. Deploy through the host project's reviewed Firebase configuration.
+
+Exact install, emulator, and deploy commands are intentionally not listed because the required manifests and Firebase configuration are absent from this repository.
+
+## Current Limitations and Safety Notes
+
+- The callable function validates only the presence of `userId`; it does not check Firebase Authentication, administrator roles, or App Check before returning team data.
+- Financial calculations and balance updates assume a specific Firestore schema and should be reviewed for business-rule accuracy before deployment.
+- Both source files initialize the Admin SDK independently, which must be reconciled if they are loaded by the same Functions process.
+- No automated tests, emulator fixtures, dependency lockfile, runtime version, Firebase configuration, or CI workflow is included.
+- No license file is present.
